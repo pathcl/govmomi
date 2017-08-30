@@ -3,6 +3,8 @@
 load test_helper
 
 @test "vm.ip" {
+  esx_env
+
   id=$(new_ttylinux_vm)
 
   run govc vm.power -on $id
@@ -31,6 +33,8 @@ load test_helper
 }
 
 @test "vm.ip -esxcli" {
+  esx_env
+
   ok=$(govc host.esxcli system settings advanced list -o /Net/GuestIPHack | grep ^IntValue: | awk '{print $2}')
   if [ "$ok" != "1" ] ; then
     skip "/Net/GuestIPHack=0"
@@ -53,6 +57,8 @@ load test_helper
 }
 
 @test "vm.create" {
+  esx_env
+
   id=$(new_ttylinux_vm)
 
   run govc vm.power -on $id
@@ -66,6 +72,8 @@ load test_helper
 }
 
 @test "vm.change" {
+  esx_env
+
   id=$(new_ttylinux_vm)
 
   run govc vm.change -g ubuntu64Guest -m 1024 -c 2 -vm $id
@@ -111,6 +119,8 @@ load test_helper
 }
 
 @test "vm.power" {
+  esx_env
+
   vm=$(new_ttylinux_vm)
 
   run vm_power_state $vm
@@ -139,6 +149,8 @@ load test_helper
 }
 
 @test "vm.power -force" {
+  esx_env
+
   vm=$(new_id)
   govc vm.create $vm
 
@@ -171,6 +183,8 @@ load test_helper
 }
 
 @test "vm.create pvscsi" {
+  esx_env
+
   vm=$(new_id)
   govc vm.create -on=false -disk.controller pvscsi $vm
 
@@ -198,6 +212,8 @@ load test_helper
 }
 
 @test "vm.info" {
+  vcsim_env -esx
+
   local num=3
 
   local prefix=$(new_id)
@@ -254,9 +270,14 @@ load test_helper
   run govc vm.info -e $id
   assert_success
   assert_line "guestinfo.a: 2"
+  run govc vm.change -e "guestinfo.a=" -vm $id
+  assert_success
+  refute_line "guestinfo.a: 2"
 }
 
 @test "vm.create linked ide disk" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -270,6 +291,8 @@ load test_helper
 }
 
 @test "vm.create linked scsi disk" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -288,6 +311,8 @@ load test_helper
 }
 
 @test "vm.create scsi disk" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -307,6 +332,8 @@ load test_helper
 }
 
 @test "vm.create scsi disk with datastore argument" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -320,6 +347,8 @@ load test_helper
 }
 
 @test "vm.create iso" {
+  esx_env
+
   upload_iso
 
   vm=$(new_id)
@@ -337,6 +366,8 @@ load test_helper
 }
 
 @test "vm.create iso with datastore argument" {
+  esx_env
+
   upload_iso
 
   vm=$(new_id)
@@ -350,6 +381,8 @@ load test_helper
 }
 
 @test "vm.disk.create empty vm" {
+  esx_env
+
   vm=$(new_empty_vm)
 
   local name=$(new_id)
@@ -368,6 +401,8 @@ load test_helper
 }
 
 @test "vm.disk.create" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -390,6 +425,8 @@ load test_helper
 }
 
 @test "vm.disk.attach" {
+  esx_env
+
   import_ttylinux_vmdk
 
   vm=$(new_id)
@@ -414,6 +451,8 @@ load test_helper
 }
 
 @test "vm.create new disk with datastore argument" {
+  esx_env
+
   vm=$(new_id)
 
   run govc vm.create -disk="1GiB" -ds="${GOVC_DATASTORE}" -on=false -link=false $vm
@@ -439,6 +478,8 @@ load test_helper
 }
 
 @test "vm.register" {
+  vcsim_env -esx
+
   run govc vm.unregister enoent
   assert_failure
 
@@ -462,6 +503,7 @@ load test_helper
 
 @test "vm.clone" {
   vcsim_env
+
   vm=$(new_empty_vm)
   clone=$(new_id)
 
@@ -477,7 +519,8 @@ load test_helper
 
 @test "vm.clone change resources" {
   vcsim_env
-  vm=$(new_ttylinux_vm)
+
+  vm=$(new_empty_vm)
   clone=$(new_id)
 
   run govc vm.clone -m 1024 -c 2 -vm $vm $clone
@@ -496,7 +539,8 @@ load test_helper
 }
 
 @test "vm.migrate" {
-  vcsim_env
+  vcsim_env -cluster 2
+
   vm=$(new_empty_vm)
 
   # migrate from H0 to H1
@@ -509,6 +553,8 @@ load test_helper
 }
 
 @test "vm.snapshot" {
+  esx_env
+
   vm=$(new_ttylinux_vm)
   id=$(new_id)
 
@@ -587,5 +633,49 @@ load test_helper
 
   # now root/child is unique
   run govc snapshot.remove -vm "$vm" root/child
+  assert_success
+}
+
+@test "object name with slash" {
+  esx_env
+
+  vm=$(new_empty_vm)
+
+  name="$vm/with-slash"
+
+  # rename VM to include a '/'
+  run govc vm.change -vm "$vm" -name "$name"
+  assert_success
+
+  path=$(govc ls "vm/$name")
+
+  run govc vm.info "$name"
+  assert_success
+  assert_line "Name: $name"
+  assert_line "Path: $path"
+
+  run govc vm.info "$path"
+  assert_success
+  assert_line "Name: $name"
+  assert_line "Path: $path"
+
+  run govc find vm -name "$name"
+  assert_success "vm/$name"
+
+  # create a portgroup where name includes a '/'
+  net=$(new_id)/with-slash
+
+  run govc host.portgroup.add -vswitch vSwitch0 "$net"
+  assert_success
+
+  run govc vm.network.change -vm "$name" -net "$net" ethernet-0
+  assert_success
+
+  # change VM eth0 to use network that includes a '/' in the name
+  run govc device.info -vm "$name" ethernet-0
+  assert_success
+  assert_line "Summary: $net"
+
+  run govc host.portgroup.remove "$net"
   assert_success
 }
