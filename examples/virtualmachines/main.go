@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/vmware/govmomi/examples"
 	"github.com/vmware/govmomi/view"
@@ -32,6 +33,7 @@ import (
 )
 
 func main() {
+	start := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -64,6 +66,9 @@ func main() {
 	// Print summary per vm (see also: govc/vm/info.go)
 
 	for _, vm := range vms {
-		fmt.Printf("%s: %s\n", vm.Summary.Config.Name, vm.Summary.Config.GuestFullName)
+		fmt.Printf("%s,%s,%s,%s\n", vm.Summary.Config.InstanceUuid, vm.Summary.Runtime.PowerState, vm.Summary.Config.Name, vm.Summary.Config.GuestFullName)
 	}
+	elapsed := time.Since(start)
+
+	fmt.Printf("\nElapsed: %s \n", elapsed)
 }
